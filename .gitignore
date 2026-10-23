@@ -1,0 +1,43 @@
+# Local environments and secrets
+.venv/
+**/.env
+!**/.env.example
+
+# Python caches and local test artifacts
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+**/.coverage
+htmlcov/
+
+# Runtime-generated reports and traces
+AStock-Research-MultiAgent/logs/
+AStock-Research-MultiAgent/reports/
+AStock-Research-MultiAgent/evaluation/results/
+
+# Unfinished news fine-tuning experiments and datasets
+nasdaq_news_sentiment/
+risk_nasdaq/
+data_process.py
+download.py
+train_qwen_risk.py
+train_qwen_sentiment.py
+test_qwen_sentiment.py
+test_risk_model.py
+
+# Local model checkpoints and adapters
+Qwen/
+qwen_risk_model/
+qwen_sentiment_model/
+**/*.safetensors
+**/*.bin
+**/*.pt
+**/*.pth
+**/*.ckpt
+**/*.gguf
+
+# Editor and operating-system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
