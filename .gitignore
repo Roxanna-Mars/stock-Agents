@@ -13,6 +13,7 @@ htmlcov/
 # Web development and local persistence
 **/node_modules/
 **/dist/
+**/*.tsbuildinfo
 **/*.db
 **/*.db-shm
 **/*.db-wal
