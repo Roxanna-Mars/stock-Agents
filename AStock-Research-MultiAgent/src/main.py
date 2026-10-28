@@ -38,8 +38,12 @@ logging.getLogger("urllib3").setLevel(logging.ERROR)
 
 # 日志和状态管理相关导入
 from src.utils.logging_config import setup_logger, SUCCESS_ICON, ERROR_ICON, WAIT_ICON
-from src.utils.state_definition import AgentState
+from src.utils.state_definition import ResearchState
 from src.utils.execution_logger import initialize_execution_logger, finalize_execution_logger
+from src.domain.adapters import (
+    research_plan_from_legacy_task_plan,
+    research_request_from_legacy_data,
+)
 
 # 智能体模块导入 - 五个核心分析智能体
 from src.agents.summary_agent import summary_agent      # 总结智能体：整合所有分析结果
@@ -86,7 +90,7 @@ AGENT_NODES = {
 
 def build_workflow(requested_agents, architecture="react_multi_agent"):
     """Build only the branches required by the deterministic task plan."""
-    workflow = StateGraph(AgentState)
+    workflow = StateGraph(ResearchState)
     workflow.add_node("start_node", lambda state: state)
     workflow.add_node("summarizer", summary_agent)
     workflow.set_entry_point("start_node")
@@ -478,12 +482,18 @@ async def main():
             else:
                 initial_data["stock_code"] = stock_code
 
+        # 同时保留旧字典数据和新平台的强类型请求/计划，便于渐进迁移。
+        typed_request = research_request_from_legacy_data(initial_data)
+        typed_plan = research_plan_from_legacy_task_plan(typed_request, task_plan)
+
         # 创建LangGraph工作流的初始状态
-        initial_state = AgentState(
+        initial_state = ResearchState(
             messages=[],  # Langchain约定：消息列表
             data=initial_data,  # 应用特定数据，包含提取的信息
             metadata={},  # 其他运行时特定信息
             evidence=[],
+            request=typed_request,
+            plan=typed_plan,
         )
 
         # 查询解析完成后再构建工作流，避免专项任务无条件运行所有Agent。

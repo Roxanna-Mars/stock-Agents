@@ -1,0 +1,19 @@
+playbook_id: stock-comparison
+version: 1.0.0
+title: Comparable Stock Analysis
+description: Compares multiple companies with consistent periods, currencies, units and metrics.
+task_types: [multi_stock_comparison]
+roles: [lead, data, analysis, modeling, synthesis, report]
+data_requirements:
+  - data_type: financial_statements
+    required_fields: [revenue, net_income, free_cash_flow]
+  - data_type: valuation_metrics
+    required_fields: [pe, pb, market_cap]
+  - data_type: market_price
+    required_fields: [close]
+compute_operators: [multiples]
+output_sections: [comparison_table, fundamentals, valuation, risk_return, conclusion]
+quality_gates:
+  - comparable_periods
+  - comparable_units
+  - numeric_claims_match_calculations

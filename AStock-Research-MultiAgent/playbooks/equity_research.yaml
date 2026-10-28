@@ -1,0 +1,44 @@
+playbook_id: equity-research
+version: 1.0.0
+title: Full Equity Research
+description: Evidence-grounded company research covering fundamentals, market behavior, valuation, catalysts and risks.
+task_types:
+  - comprehensive_analysis
+  - equity_research
+roles:
+  - lead
+  - data
+  - analysis
+  - modeling
+  - bull
+  - bear
+  - judge
+  - synthesis
+  - report
+data_requirements:
+  - data_type: company_profile
+    required_fields: [name, industry, business_summary]
+  - data_type: financial_statements
+    required_fields: [revenue, operating_income, net_income, free_cash_flow]
+  - data_type: market_price
+    required_fields: [close, volume]
+  - data_type: valuation_metrics
+    required_fields: [pe, pb, market_cap]
+  - data_type: company_news
+    required: false
+compute_operators: [dcf, multiples, monte_carlo_dcf]
+output_sections:
+  - executive_summary
+  - company_overview
+  - fundamental_analysis
+  - technical_analysis
+  - valuation
+  - catalysts
+  - risks
+  - scenarios
+  - conclusion
+quality_gates:
+  - point_in_time_safe
+  - calculation_inputs_referenced
+  - numeric_claims_match_calculations
+  - report_references_resolve

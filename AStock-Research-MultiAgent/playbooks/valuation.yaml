@@ -1,0 +1,20 @@
+playbook_id: valuation
+version: 1.0.0
+title: Deterministic Valuation
+description: Produces DCF and comparable-company valuation ranges with explicit assumptions and sensitivity risks.
+task_types:
+  - valuation
+  - financial_calculation
+roles: [lead, data, modeling, bull, bear, judge, report]
+data_requirements:
+  - data_type: cash_flow_statement
+    required_fields: [free_cash_flow]
+  - data_type: capital_structure
+    required_fields: [cash, debt, shares_outstanding]
+  - data_type: peer_multiples
+    required_fields: [peer, multiple]
+compute_operators: [dcf, multiples, monte_carlo_dcf]
+output_sections: [assumptions, dcf, trading_comps, sensitivity, valuation_range, risks]
+quality_gates:
+  - calculation_inputs_referenced
+  - numeric_claims_match_calculations

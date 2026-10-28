@@ -1,0 +1,16 @@
+playbook_id: earnings-review
+version: 1.0.0
+title: Earnings Review
+description: Reviews an earnings period against prior periods and disclosed expectations without look-ahead leakage.
+task_types: [earnings_review]
+roles: [lead, data, analysis, synthesis, report]
+data_requirements:
+  - data_type: earnings_release
+    required_fields: [period_end, published_at, revenue, net_income]
+  - data_type: financial_statements
+    required_fields: [revenue, gross_profit, operating_income, net_income]
+  - data_type: management_guidance
+    required: false
+compute_operators: []
+output_sections: [headline_results, growth, margins, cash_flow, guidance, risks]
+quality_gates: [point_in_time_safe, report_references_resolve]
