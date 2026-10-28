@@ -9,12 +9,17 @@ from datetime import datetime
 from typing import Dict, Any, Optional, List
 from pathlib import Path
 import uuid
+from contextvars import ContextVar
+from typing import Callable
+
+
+EventSink = Callable[[Dict[str, Any]], None]
 
 
 class ExecutionLogger:
     """执行日志记录器"""
 
-    def __init__(self, base_log_dir: str = "logs"):
+    def __init__(self, base_log_dir: str = "logs", event_sink: EventSink | None = None):
         """
         初始化执行日志记录器
 
@@ -22,12 +27,28 @@ class ExecutionLogger:
             base_log_dir: 基础日志目录
         """
         self.base_log_dir = Path(base_log_dir)
+        self._event_sink = event_sink
         self.execution_id = self._generate_execution_id()
         self.execution_dir = self._create_execution_dir()
         self.start_time = time.time()
 
         # 记录执行开始信息
         self._log_execution_start()
+
+    def emit_event(self, event_type: str, payload: Dict[str, Any] | None = None):
+        """Emit a compact runtime event without making UI delivery a failure point."""
+        event = {
+            "type": event_type,
+            "execution_id": self.execution_id,
+            "timestamp": datetime.now().isoformat(),
+            "payload": payload or {},
+        }
+        if self._event_sink is not None:
+            try:
+                self._event_sink(event)
+            except Exception:
+                pass
+        return event
 
     def _generate_execution_id(self) -> str:
         """生成唯一的执行ID"""
@@ -67,6 +88,7 @@ class ExecutionLogger:
         }
 
         self._save_json(start_info, "execution_info.json")
+        self.emit_event("workflow.started", {"status": "running"})
 
     def log_agent_start(self, agent_name: str, input_data: Dict[str, Any]):
         """记录agent开始执行"""
@@ -80,6 +102,10 @@ class ExecutionLogger:
 
         agent_file = f"agents/{agent_name}_execution.json"
         self._save_json(agent_log, agent_file)
+        self.emit_event(
+            "agent.started",
+            {"agent_name": agent_name, "status": "running"},
+        )
 
         return agent_log
 
@@ -102,6 +128,16 @@ class ExecutionLogger:
         })
 
         self._save_json(agent_log, agent_file)
+        self.emit_event(
+            "agent.completed" if success else "agent.failed",
+            {
+                "agent_name": agent_name,
+                "status": "completed" if success else "failed",
+                "execution_time_seconds": execution_time,
+                "success": success,
+                "error": error,
+            },
+        )
         return agent_log
 
     def log_llm_interaction(self, agent_name: str, interaction_type: str,
@@ -143,7 +179,38 @@ class ExecutionLogger:
             f"llm_interactions/{agent_name}_{interaction_type}_{interaction_id}.txt"
         )
 
+        self.emit_event(
+            "llm.completed",
+            {
+                "agent_name": agent_name,
+                "interaction_type": interaction_type,
+                "execution_time_seconds": execution_time,
+                "output_length": len(output_content),
+                "token_usage": token_usage or {},
+            },
+        )
+
         return interaction_log
+
+    def log_tool_start(
+        self,
+        agent_name: str,
+        tool_name: str,
+        tool_input: Dict,
+        *,
+        call_id: str | None = None,
+    ):
+        """Emit the actual tool start before the MCP invocation begins."""
+        return self.emit_event(
+            "tool.started",
+            {
+                "call_id": call_id,
+                "agent_name": agent_name,
+                "tool_name": tool_name,
+                "input": tool_input,
+                "status": "running",
+            },
+        )
 
     def log_tool_usage(self, agent_name: str, tool_name: str, tool_input: Dict,
                        tool_output: Any, execution_time: float, success: bool = True,
@@ -176,6 +243,24 @@ class ExecutionLogger:
         tools_file = f"tools/{agent_name}_tools.jsonl"
         self._append_jsonl(tool_log, tools_file)
 
+        self.emit_event(
+            "tool.completed" if success else "tool.failed",
+            {
+                "call_id": call_id,
+                "agent_name": agent_name,
+                "tool_name": tool_name,
+                "status": "completed" if success else "failed",
+                "success": success,
+                "error": error,
+                "error_type": error_type,
+                "cache_hit": cache_hit,
+                "duplicate_call": duplicate_call,
+                "queue_wait_seconds": queue_wait_seconds,
+                "execution_time_seconds": execution_time,
+                "output_summary": str(tool_output)[:500],
+            },
+        )
+
         return tool_log
 
     def log_final_report(self, report_content: str, report_path: str):
@@ -192,6 +277,13 @@ class ExecutionLogger:
 
         # 保存报告副本
         self._save_text(report_content, "reports/final_report.md")
+        self.emit_event(
+            "report.completed",
+            {
+                "report_path": report_path,
+                "report_length": len(report_content),
+            },
+        )
 
         return report_log
 
@@ -226,6 +318,15 @@ class ExecutionLogger:
 
         # 生成可读的摘要报告
         self._generate_readable_summary(execution_info)
+        self.emit_event(
+            "workflow.completed" if success else "workflow.failed",
+            {
+                "status": "completed" if success else "failed",
+                "success": success,
+                "error": error,
+                "total_execution_time_seconds": total_execution_time,
+            },
+        )
 
         return execution_info
 
@@ -343,32 +444,39 @@ class ExecutionLogger:
 
 
 # 全局执行日志记录器实例
-_execution_logger: Optional[ExecutionLogger] = None
+_execution_logger: ContextVar[Optional[ExecutionLogger]] = ContextVar(
+    "execution_logger",
+    default=None,
+)
 
 
 def get_execution_logger() -> ExecutionLogger:
     """获取全局执行日志记录器"""
-    global _execution_logger
-    if _execution_logger is None:
-        _execution_logger = ExecutionLogger()
-    return _execution_logger
+    execution_logger = _execution_logger.get()
+    if execution_logger is None:
+        execution_logger = ExecutionLogger()
+        _execution_logger.set(execution_logger)
+    return execution_logger
 
 
 def get_active_execution_logger() -> Optional[ExecutionLogger]:
     """Return the current logger without creating an unrelated execution."""
-    return _execution_logger
+    return _execution_logger.get()
 
 
-def initialize_execution_logger(base_log_dir: str = "logs") -> ExecutionLogger:
+def initialize_execution_logger(
+    base_log_dir: str = "logs",
+    event_sink: EventSink | None = None,
+) -> ExecutionLogger:
     """初始化执行日志记录器"""
-    global _execution_logger
-    _execution_logger = ExecutionLogger(base_log_dir)
-    return _execution_logger
+    execution_logger = ExecutionLogger(base_log_dir, event_sink=event_sink)
+    _execution_logger.set(execution_logger)
+    return execution_logger
 
 
 def finalize_execution_logger(success: bool = True, error: str = None):
     """完成执行日志记录"""
-    global _execution_logger
-    if _execution_logger:
-        _execution_logger.finalize_execution(success, error)
-        _execution_logger = None
+    execution_logger = _execution_logger.get()
+    if execution_logger:
+        execution_logger.finalize_execution(success, error)
+        _execution_logger.set(None)

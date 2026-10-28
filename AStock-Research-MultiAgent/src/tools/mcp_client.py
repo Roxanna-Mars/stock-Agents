@@ -47,6 +47,14 @@ def _serialize_mcp_tool(tool):
         queue_wait = 0.0
         execution_time = 0.0
         cache_hit = False
+        execution_logger = get_active_execution_logger()
+        if execution_logger is not None and hasattr(execution_logger, "log_tool_start"):
+            execution_logger.log_tool_start(
+                agent_name=agent_name,
+                tool_name=tool_name,
+                tool_input=arguments,
+                call_id=call_id,
+            )
         try:
             cache_hit, result = get_cached_result(fingerprint)
             if cache_hit:
