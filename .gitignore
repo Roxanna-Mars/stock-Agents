@@ -10,6 +10,13 @@
 **/.coverage
 htmlcov/
 
+# Web development and local persistence
+**/node_modules/
+**/dist/
+**/*.db
+**/*.db-shm
+**/*.db-wal
+
 # Runtime-generated reports and traces
 AStock-Research-MultiAgent/logs/
 AStock-Research-MultiAgent/reports/
